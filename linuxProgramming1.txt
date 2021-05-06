@@ -1,0 +1,512 @@
+리눅스 시스템 프로그래밍
+=리눅스 커널(os)프로그래밍
+커널의 기능을 이용한 프로그래밍이다.
+os는 하드웨어를 싸는것 
+커널 함수(system(os) call function)- api(aplication process interface) (os 함수) (ex)fread,fopen)
+
+=> 
+하드웨어는 
+1.(File System)디스크(저장장치,메모리),키보드,모니터
+2.cpu(process management)
+3.네트워크 (socket communication)
+
+코딩에서 printf앞에 f를 넣어서(fprintf) 디스크에서 명령을 받을수 있다.
+
+4.쓰레드, 메시지 큐
+
+시스템 프로그래밍을 하면 프로그래밍의 이해가 높아질것?이다.
+
+open-fopen,
+read- fread,
+ fscanf, scanf, fgets, gets, getchar,
+write-fwrite
+, fprintf, printf, puts 
+close-fclose
+lseek-fseek
+
+
+
+파일 입출력 프로그래밍의 일반인 구조 
+ 
+$ vi hate.c 
+
+
+////////////////////////////////////////////////
+ #include <stdio.h>
+#include <sys/types.h>  /* open() */
+ #include <sys/stat.h>   /* open() */ 
+#include <fcntl.h>      /* open() */ 
+#include <string.h>
+#include <unistd.h>     /* write() */ 
+ 
+int main() {        
+	 int fd;       
+	  char buff[16]; 
+ 
+        fd = open("hate.txt", O_RDWR|O_CREAT, 00600); //fd는 file discrepter(handle)로 읽고 쓰고한다.
+//8진수 00600
+ 
+        write(fd, "I hate you!\n", sizeof("I hate you!\n")); 
+ 
+        lseek(fd, 0, L_SET);    //책갈피 같은 변수가 존재 => lseek(책갈피를 옮기는 느낌)
+
+//L_SET : 맨앞 L_END:맨뒤, L_CUR(current):현재위치
+     read(fd, buff, sizeof(buff));   //buffer로 파일을 읽는다. 버퍼는 16bit
+      write(1, buff, strlen(buff)); //읽으면 책갈피가 맨끝으로간다.
+ 	//0은 입력 1은 출력 2는?
+        lseek(fd, 2, L_SET);     
+    write(fd, "love", 4); 
+ 
+        close(fd); 
+	printf("fd:%d\n",fd);//fd는 3을 가지고있다. 
+			//0:표준입력-키보드 1:표준출력-모니터 2-표준오류-모니터
+} 
+/////////////////////////////////////////////////////////////////////////////
+teraterm 창에서
+ 
+$ gcc hate.c -o hate
+ $ ./hate I hate you!
+ $ cat hate.txt
+ I love you!
+
+
+$man 2 open                     //manual볼수있다.
+$man 3 printf
+$man 2 strlen
+
+종료는 q누르면 된다.
+
+$gcc hate.c -o hate --save-temps
+전처리 : hate.i(순수 c파일)
+컴파일 : hate.s(어셈블리)
+어셈블 : hate.o 
+링크 : hate.elf
+가 만들어진다.
+hate.c -> hate.i로 만들어주는거이 cpp0
+hate.i -> hate.s로 만들어주는것이 cc1
+hate.s -> hate.o로 만들어주는것이 as
+hate.o -> hate로 만들어주는것이 ld
+
+cf)
+#define MUL(a,b) a*b //전처리 지시어로 맹글수있다.
+mul(3+4,4+5); //(3+4)*(4+5)
+
+
+
+
+fork
+새로운 프로세스를 생성한다ㅣ
+프로세스vs쓰레드
+쓰레드는 메인과 서브가 전역변수를 같이 간섭가능
+프로세스는 전역변수를 서로 간섭못한다.
+fork : 분기하는, 가지를 치는
+
+$pstree(프로세스트리)
+현재시스템의 루트를 트리로 보여달라 하는것
+tera term 명령상에서 그냥치면 나옴
+
+
+
+
+
+
+
+
+
+exec
+새로운 프로그램을 올려서 변경되는것
+
+모든 프로세스는 fork에서 시작해서 이미지변경후 exit로 끝난다.
+
+exit
+
+
+일반적인 구조
+parrent:
+fork
+wait
+
+child:
+exec
+exit
+
+//exit는 호출하는데 return이 안된다.
+
+
+
+
+
+fork ? 새로운 프로세스 만들기 
+ 
+$ vi fork.c 
+ 
+int main() {
+  int pid; 
+ 
+ printf("I'm the original process with PID %d and PPID %d. \n",   
+ getpid(), getppid()); 
+ 
+ pid = fork();  
+if(pid != 0) { // 0보다 크면
+  printf("I'm the parent process with PID %d and PPID %d. \n",  
+   getpid(), getppid());  //getpid는 자기자신작업범위, getppid는 나를 만든 작업 
+  printf("My child's PID is %d\n", pid); 
+ } 
+ else { 
+  printf("I'm the child process with PID %d and PPID %d. \n", 
+    getpid(), getppid());  } 
+ 
+ printf("PID %d terminates. \n", getpid()); 
+} 
+//누가 먼저 종료될지 모른다.
+ //fork는 호출하는데 2번리턴된다.
+$ gcc fork.c -o fork 
+$ ./fork I'm the original process with PID 17413 and PPID 17185.
+ I'm the parent process with PID 17413 and PPID 17185. 
+My child's PID is 17414 PID 17413 terminates. 
+I'm the child process with PID 17414 and PPID 1.
+ PID 17414 terminates. 
+
+
+
+
+
+
+exec ? 프로세스에 새로운 프로그램 덮어쓰기 
+ 
+$ vi exec.c 
+ 
+#include <unistd.h> 
+ #include <stdio.h>
+int main() { 
+ printf("I'm process %d and I'm about to exec an ls -l\n", getpid()); 
+ execl("/bin/ls", "ls", "-l", NULL); 
+ printf("This line should never be executed\n"); 
+} 
+
+ //exec은 호출을 하면 리턴이 안된다.
+
+$ gcc exec.c -o exec
+ $ ./exec I'm process 17448 and I'm about to exec an ls -l
+
+
+#include <unistd.h>
+
+int main(){ //fork 프로그램을 실행
+	execl("./fork","fork",NULL);
+}
+
+
+$gcc fork_run.c -o fork_run
+$./fork_run 
+
+
+
+
+
+
+
+
+
+
+
+프로세스 생성시 일반적인 프로그램의 구조 
+ 
+$ vi wait.c 
+ #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>  /* open() */
+ #include <sys/stat.h>   /* open() */ 
+#include <fcntl.h>      /* open() */ 
+#include <string.h>
+#include <wait.h>
+int main() { 
+ int pid, status, childPid; 
+ 
+ printf("I'm the parent process and my PID is %d\n", getpid()); 
+ 
+ pid = fork(); 
+ if(pid != 0) { 
+  printf("I'm the parent process with PID %d and PPID %d\n",
+     getpid(), getppid()); 
+  childPid = wait(&status); 
+  printf("A child with PID %d terminated with exit code %d\n",  
+    childPid, status>>8); 
+ } 
+ else { //exec으로 대체가능
+  printf("I'm the child process with PID %d and PPID %d\n", 
+    getpid(), getppid());  
+ exit(42);  // exit를 하면 status로 가서 8비트 민다. 
+} 
+ 
+ printf("PID %d terminates\n", getpid());
+ } 
+ 
+$ gcc wait.c -o wait
+ $ ./wait I'm the parent process and my PID is 17458 
+I'm the parent process with PID 17458 and PPID 17185
+ I'm the child process with PID 17459 and PPID 17458
+ A child with PID 17459 terminated with exit code 42
+ PID 17458 terminates
+
+
+
+
+		argvc.c
+
+#include <stdio.h>
+
+int main(int argc, char *argv[]){
+	int i;
+	for(i=0;i<argc;i++){
+		printf("argv[%d]:%s\n",i,argv[i]);
+	}
+
+}//인자들이 다넘어온다.
+$ gcc argvc.c -o argvc
+$ ./argvc 1 22 333 444 -b -cd --save-temps
+
+/////////////////////////////////////////////////////
+$는 bash
+
+
+
+
+
+$ps -ef
+
+
+$which init
+$which bash
+//어디있는지 알수있다.
+
+
+
+
+
+dup2 ? 입출력 방향 바꾸기 
+ 
+$ vi redirect.c 
+#include <fcntl.h> 
+ #include <fcntl.h> 
+  #include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>  /* open() */
+ #include <sys/stat.h>   /* open() */ 
+     /* open() */ 
+#include <string.h>
+#include <wait.h>
+int main(int argc, char * argv[]) {
+  int fd; 
+ 
+ fd = open(argv[1], O_CREAT|O_TRUNC|O_WRONLY, 0600); //0600은 permission이다. ex)rwxr
+ dup2(fd, 1);  
+close(fd); 
+ execvp(argv[2], &argv[2]); 
+} 
+ 
+$ gcc redirect.c -o redirect
+ $ ./redirect ls.out ls -l 
+$ cat ls.out 
+-rw-------    1 user1    user1           0 Jan 16 14:35 ls.out -rwxrwxr-x 
+   1 user1    user1       13844 Jan 16 14:35 redirect -rw-r--r--    1 user1    user1    
+     186 Jan 16 14:35 redirect.c 
+//file descriptor table이 있는데 거기의 주소값들이 있따. 그것들이 각 file들에 연결이
+//돼있는데 내가 만든 새로운 파일에 저장을하고싶은것
+//주소값에 쓰면 다른경로로 변경할수있다.
+//화면쪽의 파일(화면은 날아간다.)을 다른 파일로 저장시켜버리는것
+
+
+
+
+
+리눅스 명령어
+
+1. 디렉터리
+ls(list:디렉토리 보기)
+어떤 파일이 있는지 보는것(간단하게)
+ls -l(자세하게)
+ls -al(.으로 표시된 파일을 (숨겨져있ㅇ서 안보인다) 보는것)
+
+
+
+pwd(현재 쉘의 위치(디렉토리 확인)
+
+cd(체인지 디렉토리(디렉토리 이동))
+cd / (최상위로 이동) : 절대경로
+cd ..(이전(상위) 폴더로 이동) : 상대경로
+cd De
+cd : 홈으로
+cd~ : 홈으로
+
+mkdir(디렉토리 만들기(빈 디렉토리 생성))
+ex)mkdir tmpdir
+rmdir(디레토리 지우기(빈 디렉터리 삭제))
+rmdir tmpdir(모두 지워버려서 잘안쓴다.)
+rm -rf tmpdir(false일뗑,
+
+2. 파일
+file : 파일종류확인
+file example.desktop
+file Desktop
+file /bin/uname
+
+cat(caternate) : 파일 전체 보기연속으로 붙이다. 전체 보여준다.
+cat example.desktop
+
+head:파일 앞쪽만 부분으로 보여준다.
+head example.desktop
+ head example.desktop -n 20
+
+tail:파일 뒤쪽만 부분으로 보여준다.
+tail example.desktop
+tail example.desktop -n 20
+
+cp : 복사
+cp example.desktop tmp.txt
+cp /etc ./ -rf (etc꺼를 현재 디렉토리로 옮기낟?)
+
+mv: 파일 이름변경, 
+mv tmp.txt tmp.bin  파일 이름변경
+mv tmp.txt desktop  파일 옮기기
+
+디렉토리도 가능
+mkdir tmpdir을 만들고
+mv tmpdir desktop : 디렉토리 옮기기
+
+rm: 지우기
+rm tmpfile
+mkdir tmpdir
+touch tmpdir/tmpfile
+rmdir tmpdir (x 안된다)
+rm tmpdir -r
+
+touch: 빈파일 만들기
+touch tmpfile
+
+grep : 파일에서 문자열 찾기
+grep for example.desktop : example에서 for 문자열 찾기
+grep Ubuntu example.desktop
+grep Ubuntu /etc -rn
+ls -l | grep example
+ps -ef | grep init
+ls -l/dev | wc 몇개있는지 수치로 보기
+
+ls -l/dev | grep tty (tty가 들어간것 다찾는거)
+
+find : 파일 찾기
+find ./ -name tmpfile
+find /etc -name passwd
+find /etc -name passwd -exec ls -l {} \;
+파일 집합에 관해서 ls -l하겠다.
+
+find /etc -name passwd -exec cat {} \;
+find /etc -name passwd -exec wc {} \;
+find /etc -name passwd -exec grep pi {} \;
+find /etc -name passwd -exec 요기에 명령어 집어넣을수 있다. {} \;
+
+
+3. 프로세스
+ps(프로세스 목록 보기)(cpu 작업 목록)
+ps -ef(프로세스 보는것)
+ps -ef | wc
+ps -ef | grep sshd
+pstree 트리 형태로
+pstree
+
+kill 신호 보내기
+kill -l 시그널 목록보기
+창1에서 sleep 1000
+창2에서 ps -ef | grep sleep
+	kill -9 3000 //-9는 기본?
+	kill-2 3005
+	kill -24 3010
+killall -9 sleep (프로그램 이름(sleep)하면 도니다)
+(신호보내기)
+
+
+
+
+ctrl+z 잠시멈춤 신호
+ctrl+c 종료
+fg fore ground (사용자 입력 받을 수 있는상태 신호)
+
+bg back ground 사용자 입력을 받을 수 없는 상태 신호
+bg %1 : bg상태 사용자 입력이 전달 안되는 상태
+fg %1 : 다시 fg상태
+
+
+ex)
+case1
+sleep 1000 : fg상태가 된다. 사용자 입력이 커널에 의해서 전달될수 있는 상태
+ctrl+z : 잠시 멈춤
+bg %1 : background상태 사용자 입력 전달이 안되는것 (cpu 수행되는것)
+fg %1 : 다시 fg상태
+
+bg안쓰면 핑 떄리기전까지 기다림
+
+
+case2
+sleep 1000& : bg상태
+jobs
+fg %1 : fg상태
+ctrl+c : 종료
+
+
+사용자 입력을 쓰지않는 것은 백그라운드로 돌려서 여러개 작업 수행할수있다.
+
+기타
+
+man : manual
+man ls
+man 1 ls : 명령어
+man 2 open : 시스템 콜 함수
+man 3 printf : 라이브러리 함수
+Page Up/Page Down
+
+/문자열, n, shift+n
+
+q : 종료
+
+man에 있는것도 있고 없는것도 있다.
+없는것은 shell이 본연하게 가지고 있는것
+
+4. vi 편집기
+
+sudo apt-get install vim -y (vim apt-get 설치 (include))
+vi hello.c
+편집모드 : i
+명령모드 : Esc, :w, :q, :wq, :q!(순서대로 저장 ,종료, 저장후 종료, 저장안하고 종료)
+이동 : 방향키,Page Up/Page Down, :257 (콜론후 숫자 넣으면 지정 줄로 감),:$(맨밑으로), :1
+	:set nu, :setnonu (줄을 숫자로 표시, 줄번호 비표시)
+삭제 : x(한글자), dw(delete word 한단어 지우기), dd(1쥴 지우기), 
+			:10, 100d 열번째줄부터 100줄까지 삭제
+		v 누르고 블럭치고 d , ctrl+v해서 블럭치고 d
+ex) 3dd(3줄 지우기)
+
+취소 : u
+취소를 취소 하는것 : ctrl+r
+
+cf) vt를 입력하면 블록을 칠수있다.
+
+복사 : yy(한줄), 3yy(3줄), :10,20y    (d랑 쓰는 양식이 비슷하다)
+붙여넣기 : p 
+문자열찾기 : /문자열, n, shift+n
+문자열 치환 :    :s/for/FOR/ :s/FOR// :s/for/FOR/g
+		:1,$s/for/FOR/g
+
+
+example1) 
+$cd
+$cp /etc/services ./        //copy해온다
+$vi services
+이후 실습해본다
+
+
+
+
+
+
+

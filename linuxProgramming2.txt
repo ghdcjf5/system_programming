@@ -1,0 +1,177 @@
+file process socket thread
+
+
+
+
+gets -> fork->wait 
+
+socket과 accept로 접속을 기다린다.
+
+
+
+
+
+~$ netstat -an --tcp
+Active Internet connections (servers and established)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN
+tcp        0    216 192.168.137.20:22       192.168.137.1:50680     ESTABLISHED
+tcp6       0      0 :::22                   :::*                    LISTEN
+
+22 옆에 192.~~~~가 teraterm 소켓 bash 같은것
+접속이 들어오면 fork를 하고 통신을 한다.
+
+
+
+통신은 내부와 외부통신 이있다.
+
+내부통신은 pipe (signal), message queue
+외부통신은 socket
+
+프로젝트시는 socket으로 labview랑 통신
+
+
+
+
+pipe ? 단방향 프로세스간 통신    socket은 양방향 통신
+ 
+$ vi talk.c 
+ 
+#define READ 0
+ #define WRITE 1 
+ 
+char * phrase = "Stuff this in your pipe and smoke it"; 
+ 
+int main() { 
+ int fd[2], bytesRead; 
+ char message[100]; 
+ 
+ pipe(fd); 
+
+//child가 쓰고 parent가 읽는다.
+
+ if(fork() == 0) { 
+  close(fd[READ]);  
+ write(fd[WRITE], phrase, strlen(phrase)+1); 
+  close(fd[WRITE]); 
+ } 
+ else {  
+ close(fd[WRITE]); 
+  bytesRead = read(fd[READ], message, 100); 
+  printf("Read %d bytes: %s\n", bytesRead, message); 
+  close(fd[READ]); 
+ }
+ } 
+ 
+$ gcc talk.c ?o talk $ ./talk 
+
+
+
+open을 하게되면 내부적으로 kernel에서(리눅스 안쪽에서) file descript table 이라는 내부적인 배열이 있다.
+ file descript table은 주소값을 가지고 있다.
+
+
+proc은 프로세스의 os의 여러 정보를 관리하는 디렉토리(메모리에서 접근하는것 (file처럼 ))
+
+
+
+
+
+#include <unistd.h> 
+ 
+#define READ 0 
+#define WRITE 1 
+ 
+int main(int argc, char * argv[]) { 
+ int fd[2]; 
+ 
+ pipe(fd); 
+ 
+ if(fork() != 0) { 
+  close(fd[READ]);   
+dup2(fd[WRITE], 1); 
+  close(fd[WRITE]); 
+  execlp(argv[1], argv[1], NULL); 
+ } 
+ else {
+   close(fd[WRITE]); 
+  dup2(fd[READ], 0); 
+  close(fd[READ]); 
+  execlp(argv[2], argv[2], NULL);
+  }
+ } 
+ 
+# gcc connect.c ?o connect # ./connect env wc 
+
+
+
+
+
+
+
+유닉스 통신을 위해 socket사용
+파일 접근을 위해 open
+
+socket은 연결지향 ->ex)전화 dusrufwlgid epdlxj wnrhqkedmfEo
+	 TCP
+	  데이터그램 -> 메세지 택배같은것
+	  UDP
+두개를 합쳐서 IP라고 한다.
+
+
+socket 통신
+TCP통신에서는
+
+vi mysever.c                  vi myclient.c
+
+
+int main(){			int main(){
+	socket();			socket();
+	bind(); 			connect();	
+//소켓과 주소를 묶어주는것		write();//send가능
+	listen();			read(); //recv가능
+	accept();			close();
+	read(); //recv가능
+	write();//send가능
+	close();
+}					}
+
+
+
+UDP 통신에서는
+
+int fd = socket (AF_INET,SOCK_DGRAM,0);
+//sockaddr_in 과같다
+
+bind(fd,~~~);
+recvfrom();
+sendto();
+close();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
